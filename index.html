@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stopwatch</title>
+    <style>
+        body {
+            background-color: #0b0f19;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .timer-container {
+            text-align: center;
+            z-index: 2;
+        }
+
+        .display {
+            font-size: 6rem;
+            font-weight: 300;
+            font-variant-numeric: tabular-nums;
+            margin-bottom: 2.5rem;
+            letter-spacing: 2px;
+            color: #f3f4f6;
+            text-shadow: 0 0 20px rgba(255,255,255,0.05);
+        }
+
+        .controls {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+        }
+
+        button {
+            background: #1f2937;
+            color: #e5e7eb;
+            border: 1px solid #374151;
+            padding: 16px 40px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            min-width: 140px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        button:active {
+            transform: scale(0.96);
+        }
+
+        #startStopBtn {
+            background: #064e3b;
+            color: #34d399;
+            border-color: #047857;
+        }
+
+        #startStopBtn.running {
+            background: #7f1d1d;
+            color: #f87171;
+            border-color: #b91c1c;
+        }
+
+        /* SECRET CONTROL PANEL */
+        .secret-panel {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #111827;
+            border-top: 1px solid #1f2937;
+            padding: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+            opacity: 0.02; /* Nearly invisible to an outside viewer */
+            transition: opacity 0.3s ease;
+            z-index: 10;
+        }
+
+        /* Hovering or tapping near the bottom reveals it clearly */
+        .secret-panel:hover {
+            opacity: 1;
+            background: #111827;
+        }
+
+        .secret-panel label {
+            font-size: 0.85rem;
+            color: #9ca3af;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .secret-panel input, .secret-panel select {
+            background: #1f2937;
+            border: 1px solid #374151;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        .secret-btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            min-width: auto;
+        }
+        .secret-btn:hover { background: #1d4ed8; }
+    </style>
+</head>
+<body>
+
+    <div class="timer-container">
+        <!-- Main Rigged Display -->
+        <div class="display" id="display">00:00.00</div>
+        
+        <!-- Standard Buttons Only -->
+        <div class="controls">
+            <button id="startStopBtn" onclick="toggleTimer()">Start</button>
+            <button id="resetBtn" onclick="resetTimer()">Reset</button>
+        </div>
+    </div>
+
+    <!-- HIDE/HOVER CONTROL PANEL AT THE BOTTOM OF THE SCREEN -->
+    <div class="secret-panel">
+        <label>
+            Speed Multiplier
+            <select id="speedModifier" onchange="updateSpeed()">
+                <option value="4" selected>4x Fast (Default)</option>
+                <option value="1">Normal (1x)</option>
+                <option value="2">Double Speed (2x)</option>
+                <option value="8">Super Fast (8x)</option>
+                <option value="0">Freeze/Stop Clock</option>
+            </select>
+        </label>
+
+        <label>
+            Force Time (MM:SS.ms)
+            <input type="text" id="forceTimeInput" placeholder="02:15.00">
+        </label>
+        
+        <button class="secret-btn" onclick="injectTime()">Inject Time</button>
+        <button class="secret-btn" style="background:#4b5563;" onclick="triggerGlitch()">Glitch/Skip 5s</button>
+    </div>
+
+    <script>
+        let timerInterval = null;
+        let isRunning = false;
+        
+        // Internal tracking counters
+        let totalMilliseconds = 0;
+        let currentSpeed = 4; // Updated default speed to 4x fast
+
+        function toggleTimer() {
+            const btn = document.getElementById('startStopBtn');
+            if (!isRunning) {
+                isRunning = true;
+                btn.textContent = 'Stop';
+                btn.classList.add('running');
+                // Run master loop every 10ms
+                timerInterval = setInterval(runTick, 10);
+            } else {
+                isRunning = false;
+                btn.textContent = 'Start';
+                btn.classList.remove('running');
+                clearInterval(timerInterval);
+            }
+        }
+
+        function runTick() {
+            // Adjust time accumulation based on your hidden speed setting
+            totalMilliseconds += (10 * currentSpeed);
+            if (totalMilliseconds < 0) totalMilliseconds = 0;
+            
+            displayFormattedTime(totalMilliseconds);
+        }
+
+        function displayFormattedTime(msTotal) {
+            let rem = msTotal;
+
+            const min = Math.floor(rem / 60000);
+            rem %= 60000;
+
+            const sec = Math.floor(rem / 1000);
+            rem %= 1000;
+
+            // Get tens of milliseconds (2 digits)
+            const ms = Math.floor(rem / 10);
+
+            const fMin = min.toString().padStart(2, '0');
+            const fSec = sec.toString().padStart(2, '0');
+            const fMs = ms.toString().padStart(2, '0');
+
+            document.getElementById('display').textContent = `${fMin}:${fSec}.${fMs}`;
+        }
+
+        function resetTimer() {
+            isRunning = false;
+            clearInterval(timerInterval);
+            totalMilliseconds = 0;
+            displayFormattedTime(0);
+            
+            const btn = document.getElementById('startStopBtn');
+            btn.textContent = 'Start';
+            btn.classList.remove('running');
+        }
+
+        /* --- SECRET CONTROL PANEL FUNCTIONS --- */
+
+        function updateSpeed() {
+            currentSpeed = parseFloat(document.getElementById('speedModifier').value);
+        }
+
+        // Instantly forces the timer to jump to whatever numbers you want
+        function injectTime() {
+            const input = document.getElementById('forceTimeInput').value.trim();
+            if (!input) return;
+
+            try {
+                // Expecting format MM:SS.cs or MM:SS
+                const parts = input.split(':');
+                const min = parseInt(parts[0], 10) || 0;
+                
+                const secParts = parts[1].split('.');
+                const sec = parseInt(secParts[0], 10) || 0;
+                const ms = parseInt(secParts[1], 10) || 0;
+
+                // Re-calculate total internal milliseconds
+                totalMilliseconds = (min * 60 * 1000) + (sec * 1000) + (ms * 10);
+                displayFormattedTime(totalMilliseconds);
+            } catch (e) {
+                alert("Use format MM:SS.ms (e.g. 01:23.45)");
+            }
+        }
+
+        // Secret jump button to skip ahead seamlessly
+        function triggerGlitch() {
+            totalMilliseconds += 5000; // Jump ahead 5 seconds instantly
+            displayFormattedTime(totalMilliseconds);
+        }
+    </script>
+</body>
+</html>
